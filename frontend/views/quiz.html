@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Kuis — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4" style="max-width:760px;">
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+    <div id="errorState" class="ea-card p-4 text-center d-none">
+      <p class="mb-0" id="errorMessage"></p>
+      <button class="btn btn-outline-primary mt-3" onclick="eaNavigateTo('lessons')">Kembali ke Materi</button>
+    </div>
+
+    <div id="quizState" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0" id="quizTitle"></h1>
+        <span class="badge bg-light text-dark" id="attemptInfo"></span>
+      </div>
+      <p class="text-muted" id="quizInstructions"></p>
+
+      <div id="questionsContainer"></div>
+
+      <button class="btn btn-ea-primary px-4" onclick="submitQuiz()">Kumpulkan Jawaban</button>
+    </div>
+
+    <div id="resultState" class="d-none text-center">
+      <div class="ea-card p-5">
+        <h1 class="display-5" id="resultPercentage"></h1>
+        <p class="text-muted" id="resultPassStatus"></p>
+        <button class="btn btn-ea-primary mt-3" onclick="eaNavigateTo('lessons')">Kembali ke Materi</button>
+      </div>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['student']);
+    var quizId, startTime;
+
+    if (session) {
+      eaRenderNav(session);
+      startTime = Date.now();
+
+      eaGetUrlParams(function (params) {
+        quizId = params.quizId;
+        if (!quizId) {
+          document.getElementById('loadingState').classList.add('d-none');
+          document.getElementById('errorState').classList.remove('d-none');
+          document.getElementById('errorMessage').textContent = 'ID kuis tidak ditemukan di tautan ini.';
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler(function (data) {
+            document.getElementById('loadingState').classList.add('d-none');
+            document.getElementById('quizState').classList.remove('d-none');
+            renderQuiz(data);
+          })
+          .withFailureHandler(function (err) {
+            document.getElementById('loadingState').classList.add('d-none');
+            document.getElementById('errorState').classList.remove('d-none');
+            document.getElementById('errorMessage').textContent = (err && err.message) || 'Kuis tidak tersedia.';
+          })
+          .getQuizForAttempt(session.token, quizId);
+      });
+    }
+
+    var currentAttemptId, currentQuiz;
+
+    function renderQuiz(data) {
+      currentAttemptId = data.attemptId;
+      currentQuiz = data.quiz;
+      document.getElementById('quizTitle').textContent = data.quiz.Title;
+      document.getElementById('quizInstructions').textContent = data.quiz.Instructions || '';
+      document.getElementById('attemptInfo').textContent =
+        'Percobaan ke-' + data.attemptNumber + ' (sisa ' + data.attemptsRemaining + ')';
+
+      document.getElementById('questionsContainer').innerHTML = data.questions.map(function (q, idx) {
+        return renderQuestion(q, idx);
+      }).join('');
+    }
+
+    function renderQuestion(q, idx) {
+      var header = '<div class="ea-card p-4 mb-3"><p class="fw-semibold mb-3">' + (idx + 1) + '. ' + q.QuestionText + '</p>';
+      var body = '';
+
+      if (q.QuestionType === 'mc' || q.QuestionType === 'tf') {
+        var options = q.QuestionType === 'tf' ? ['True', 'False'] : (q.Options.choices || []);
+        body = options.map(function (opt) {
+          return '<div class="form-check"><input class="form-check-input" type="radio" name="q_' + q.QuestionID + '" value="' + opt + '" id="' + q.QuestionID + '_' + opt + '">' +
+            '<label class="form-check-label" for="' + q.QuestionID + '_' + opt + '">' + opt + '</label></div>';
+        }).join('');
+      } else if (q.QuestionType === 'mr') {
+        body = (q.Options.choices || []).map(function (opt) {
+          return '<div class="form-check"><input class="form-check-input" type="checkbox" name="q_' + q.QuestionID + '" value="' + opt + '" id="' + q.QuestionID + '_' + opt + '">' +
+            '<label class="form-check-label" for="' + q.QuestionID + '_' + opt + '">' + opt + '</label></div>';
+        }).join('');
+      } else if (q.QuestionType === 'fillblank') {
+        body = '<input type="text" class="form-control" name="q_' + q.QuestionID + '" placeholder="Jawabanmu...">';
+      } else if (q.QuestionType === 'essay') {
+        body = '<textarea class="form-control" name="q_' + q.QuestionID + '" rows="4" placeholder="Tulis jawabanmu..."></textarea>' +
+          '<p class="small text-muted mt-1">Soal esai dinilai manual oleh guru.</p>';
+      } else if (q.QuestionType === 'matching') {
+        body = '<p class="small text-muted">Tuliskan pasangan sesuai format: kiri=kanan, satu per baris.</p>' +
+          '<textarea class="form-control" name="q_' + q.QuestionID + '" rows="3" placeholder="1=A&#10;2=B"></textarea>';
+      }
+
+      return header + body + '</div>';
+    }
+
+    function collectAnswers() {
+      var answers = [];
+      document.querySelectorAll('#questionsContainer > div').forEach(function (card, idx) {
+        // Reconstruct from the rendered inputs by name attribute prefix "q_"
+      });
+      // Simpler: iterate based on input/textarea name attributes grouped by question ID
+      var seen = {};
+      document.querySelectorAll('[name^="q_"]').forEach(function (el) {
+        var questionId = el.name.replace('q_', '');
+        if (seen[questionId]) return;
+        seen[questionId] = true;
+
+        var type = el.type === 'radio' || el.type === 'checkbox'
+          ? (document.querySelectorAll('[name="' + el.name + '"]')[0].type)
+          : el.tagName.toLowerCase();
+
+        var studentAnswer;
+        if (el.type === 'radio') {
+          var checked = document.querySelector('[name="' + el.name + '"]:checked');
+          studentAnswer = { selected: checked ? checked.value : null };
+        } else if (el.type === 'checkbox') {
+          var checkedAll = document.querySelectorAll('[name="' + el.name + '"]:checked');
+          studentAnswer = { selected: Array.from(checkedAll).map(function (c) { return c.value; }) };
+        } else if (el.tagName === 'TEXTAREA' && el.rows === 3) {
+          var pairs = {};
+          el.value.split('\n').forEach(function (line) {
+            var parts = line.split('=');
+            if (parts.length === 2) pairs[parts[0].trim()] = parts[1].trim();
+          });
+          studentAnswer = { pairs: pairs };
+        } else if (el.tagName === 'TEXTAREA') {
+          studentAnswer = { text: el.value };
+        } else {
+          studentAnswer = { text: el.value };
+        }
+
+        answers.push({ questionId: questionId, studentAnswer: studentAnswer });
+      });
+      return answers;
+    }
+
+    function submitQuiz() {
+      var answers = collectAnswers();
+      var timeTaken = Math.round((Date.now() - startTime) / 1000);
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (!res.success) { eaToast('error', res.message); return; }
+          document.getElementById('quizState').classList.add('d-none');
+          document.getElementById('resultState').classList.remove('d-none');
+          document.getElementById('resultPercentage').textContent = res.score.Percentage + '%';
+          document.getElementById('resultPassStatus').textContent = res.passed
+            ? 'Selamat, kamu lulus passing score!' : 'Belum mencapai passing score. Coba lagi jika masih ada kesempatan.';
+        })
+        .withFailureHandler(function (err) {
+          eaToast('error', 'Gagal mengumpulkan jawaban.');
+          console.error(err);
+        })
+        .submitQuizAttempt(session.token, quizId, currentAttemptId, answers, timeTaken);
+    }
+  </script>
+</body>
+</html>

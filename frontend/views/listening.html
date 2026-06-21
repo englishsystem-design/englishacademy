@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Latihan Mendengarkan — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4" style="max-width:700px;">
+    <h1 class="h3 mb-1">Latihan Mendengarkan</h1>
+    <p class="text-muted mb-4">Putar audio/video dari materi, atur kecepatan, lalu kerjakan kuis pemahamannya.</p>
+
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+    <div id="lessonList" class="row g-3"></div>
+    <p id="emptyState" class="text-muted d-none">Belum ada materi audio/video yang tersedia untuk kelasmu.</p>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['student']);
+
+    if (session) {
+      eaRenderNav(session);
+      google.script.run.withSuccessHandler(function (profile) {
+        loadListeningLessons(profile ? profile.Kelas : 'X');
+      }).getMyStudentProfile(session.token);
+    }
+
+    function loadListeningLessons(kelas) {
+      google.script.run.withSuccessHandler(function (modules) {
+        document.getElementById('loadingState').classList.add('d-none');
+
+        if (modules.length === 0) {
+          document.getElementById('emptyState').classList.remove('d-none');
+          return;
+        }
+
+        // For each module, fetch its lessons and keep only ones with video/audio attached.
+        var pending = modules.length;
+        var cards = [];
+
+        modules.forEach(function (m) {
+          google.script.run.withSuccessHandler(function (lessons) {
+            lessons.filter(function (l) { return !!l.VideoID; }).forEach(function (l) {
+              cards.push({ module: m, lesson: l });
+            });
+            pending--;
+            if (pending === 0) renderCards(cards);
+          }).listLessonsByModule(session.token, m.ModuleID);
+        });
+      }).listModules(session.token, kelas);
+    }
+
+    function renderCards(cards) {
+      var container = document.getElementById('lessonList');
+      if (cards.length === 0) {
+        document.getElementById('emptyState').classList.remove('d-none');
+        return;
+      }
+      container.innerHTML = cards.map(function (c, idx) {
+        return '<div class="col-12"><div class="ea-card p-4" id="card_' + idx + '">' +
+          '<p class="ea-eyebrow mb-1">' + c.module.ModuleTitle + '</p>' +
+          '<h2 class="h5 mb-3">' + c.lesson.LessonTitle + '</h2>' +
+          '<div id="player_' + idx + '"></div>' +
+          '<div class="d-flex align-items-center gap-2 mt-2">' +
+          '<label class="small text-muted mb-0">Kecepatan:</label>' +
+          '<select class="form-select form-select-sm" style="width:auto;" onchange="setSpeed(' + idx + ', this.value)">' +
+          '<option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option>' +
+          '</select>' +
+          '<button class="btn btn-sm btn-outline-primary ms-auto" onclick="eaNavigateTo(\'lessons\')">Lihat Modul</button>' +
+          '</div></div></div>';
+      }).join('');
+
+      cards.forEach(function (c, idx) {
+        loadPlayer(idx, c.lesson.LessonID);
+      });
+    }
+
+    function loadPlayer(idx, lessonId) {
+      google.script.run.withSuccessHandler(function (lesson) {
+        var container = document.getElementById('player_' + idx);
+        if (!lesson.video) { container.innerHTML = '<p class="text-muted small">Audio/video tidak tersedia.</p>'; return; }
+
+        if (lesson.video.sourceType === 'youtube') {
+          var idMatch = lesson.video.url.match(/(?:v=|youtu\.be\/)([^&]+)/);
+          container.innerHTML = '<div class="ratio ratio-16x9"><iframe id="media_' + idx + '" src="https://www.youtube.com/embed/' + (idMatch ? idMatch[1] : '') + '" allowfullscreen></iframe></div>';
+        } else {
+          container.innerHTML = '<audio id="media_' + idx + '" controls class="w-100" src="' + lesson.video.url + '"></audio>';
+        }
+      }).getLesson(session.token, lessonId);
+    }
+
+    function setSpeed(idx, rate) {
+      var el = document.getElementById('media_' + idx);
+      if (el && el.tagName === 'AUDIO') el.playbackRate = Number(rate);
+      // YouTube iframe playback rate isn't controllable without the YouTube
+      // IFrame Player API — acceptable simplification for v1 (audio is the
+      // primary listening-practice format; YouTube videos play at 1x).
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!--
+  partials/navbar.html
+  Same markup for every role — links are shown/hidden client-side once
+  eaRequireLogin() resolves the session, via the data-role attribute.
+  Avoids needing a different navbar template per role.
+-->
+<nav class="navbar navbar-expand-lg ea-navbar sticky-top px-3 px-lg-4 py-2">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="#" onclick="eaNavigateTo(eaGetSession() ? 'dashboard-' + eaGetSession().role : 'landing'); return false;">
+      <span class="ea-badge-kelas">EA</span>
+      English<span>Academy</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#eaNavbarLinks">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="eaNavbarLinks">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="eaNavLinks">
+        <!-- populated by eaRenderNav() once the session role is known -->
+      </ul>
+      <ul class="navbar-nav align-items-lg-center gap-lg-2">
+        <li class="nav-item position-relative">
+          <a class="nav-link" href="#" onclick="eaShowNotifications(); return false;">
+            <i class="bi bi-bell"></i>
+            <span id="eaNotifBadge" class="badge bg-danger rounded-pill d-none" style="font-size:.6rem;">0</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <span class="nav-link" id="eaUserName" style="color: var(--ea-ink); font-weight:600;"></span>
+        </li>
+        <li class="nav-item">
+          <button class="btn btn-sm btn-outline-secondary" onclick="eaLogout()">
+            <i class="bi bi-box-arrow-right"></i> Keluar
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<script>
+  var EA_NAV_BY_ROLE = {
+    admin: [
+      { page: 'dashboard-admin', label: 'Dashboard', icon: 'bi-speedometer2' },
+      { page: 'admin-users', label: 'Pengguna', icon: 'bi-people' },
+      { page: 'lessons', label: 'Materi', icon: 'bi-journal-text' },
+      { page: 'attendance', label: 'Kehadiran', icon: 'bi-calendar-check' }
+    ],
+    teacher: [
+      { page: 'dashboard-teacher', label: 'Dashboard', icon: 'bi-speedometer2' },
+      { page: 'lessons', label: 'Materi', icon: 'bi-journal-text' },
+      { page: 'assignments', label: 'Tugas', icon: 'bi-clipboard-check' },
+      { page: 'attendance', label: 'Kehadiran', icon: 'bi-calendar-check' }
+    ],
+    student: [
+      { page: 'dashboard-student', label: 'Dashboard', icon: 'bi-speedometer2' },
+      { page: 'lessons', label: 'Materi', icon: 'bi-journal-text' },
+      { page: 'assignments', label: 'Tugas', icon: 'bi-clipboard-check' },
+      { page: 'ocr', label: 'OCR', icon: 'bi-camera' },
+      { page: 'translator', label: 'Translator', icon: 'bi-translate' },
+      { page: 'vocabulary', label: 'Kosakata', icon: 'bi-book' },
+      { page: 'certificates', label: 'Sertifikat', icon: 'bi-award' }
+    ]
+  };
+
+  function eaRenderNav(session) {
+    document.getElementById('eaUserName').textContent = session.fullName;
+    var links = EA_NAV_BY_ROLE[session.role] || [];
+    var html = links.map(function (l) {
+      return '<li class="nav-item"><a class="nav-link" data-page="' + l.page + '" href="#" ' +
+        'onclick="eaNavigateTo(\'' + l.page + '\'); return false;"><i class="bi ' + l.icon + ' me-1"></i>' + l.label + '</a></li>';
+    }).join('');
+    document.getElementById('eaNavLinks').innerHTML = html;
+    eaRefreshNotificationBadge();
+
+    // Active-link highlighting is cosmetic only — fetched async via the
+    // safe eaGetUrlParams helper (see partials/head.html) so it can never
+    // throw and block the rest of the page's script from running, which
+    // was the root cause of dashboards hanging on the loading spinner.
+    eaGetUrlParams(function (params) {
+      if (!params.page) return;
+      var link = document.querySelector('#eaNavLinks [data-page="' + params.page + '"]');
+      if (link) link.classList.add('active');
+    });
+  }
+
+  function eaRefreshNotificationBadge() {
+    var session = eaGetSession();
+    if (!session) return;
+    google.script.run.withSuccessHandler(function (count) {
+      var badge = document.getElementById('eaNotifBadge');
+      if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.classList.remove('d-none');
+      } else {
+        badge.classList.add('d-none');
+      }
+    }).getUnreadNotificationCount(session.token);
+  }
+
+  function eaShowNotifications() {
+    var session = eaGetSession();
+    if (!session) return;
+    google.script.run.withSuccessHandler(function (notifications) {
+      var html = notifications.length === 0
+        ? '<p class="text-muted">Belum ada notifikasi.</p>'
+        : notifications.map(function (n) {
+            return '<div class="text-start border-bottom py-2"><strong>' + n.Title + '</strong>' +
+              '<div class="small text-muted">' + n.Message + '</div></div>';
+          }).join('');
+      Swal.fire({ title: 'Notifikasi', html: '<div style="max-height:300px;overflow-y:auto;">' + html + '</div>', confirmButtonText: 'Tutup' });
+      google.script.run.markAllNotificationsRead(session.token);
+      eaRefreshNotificationBadge();
+    }).listMyNotifications(session.token, 20);
+  }
+</script>

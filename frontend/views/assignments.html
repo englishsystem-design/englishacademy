@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Tugas — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4">
+    <h1 class="h3 mb-1">Tugas</h1>
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+
+    <!-- Student view -->
+    <div id="studentView" class="d-none row g-3"></div>
+
+    <!-- Teacher/Admin view -->
+    <div id="managerView" class="d-none">
+      <button class="btn btn-ea-primary mb-3" onclick="createAssignmentFlow()"><i class="bi bi-plus-lg me-1"></i>Buat Tugas Baru</button>
+      <div id="managerList" class="row g-3"></div>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['admin', 'teacher', 'student']);
+
+    if (session) {
+      eaRenderNav(session);
+      if (session.role === 'student') loadStudentView(); else loadManagerView();
+    }
+
+    function loadStudentView() {
+      google.script.run.withSuccessHandler(function (assignments) {
+        document.getElementById('loadingState').classList.add('d-none');
+        document.getElementById('studentView').classList.remove('d-none');
+
+        if (assignments.length === 0) {
+          document.getElementById('studentView').innerHTML = '<p class="text-muted">Belum ada tugas yang diberikan.</p>';
+          return;
+        }
+        document.getElementById('studentView').innerHTML = assignments.map(function (a) {
+          var sub = a.mySubmission;
+          var statusBadge = !sub
+            ? '<span class="badge bg-secondary-subtle text-secondary">Belum Dikumpulkan</span>'
+            : { submitted: '<span class="badge bg-info-subtle text-info">Terkumpul</span>',
+                late: '<span class="badge bg-warning-subtle text-warning">Terlambat</span>',
+                graded: '<span class="badge bg-success-subtle text-success">Dinilai</span>' }[sub.Status];
+
+          var actionButton = (!sub || sub.Status !== 'graded')
+            ? '<button class="btn btn-sm btn-ea-primary mt-2" onclick="submitAssignmentFlow(\'' + a.AssignmentID + '\')">' +
+              (sub ? 'Kumpulkan Ulang' : 'Kumpulkan Tugas') + '</button>' : '';
+
+          return '<div class="col-md-6"><div class="ea-card p-3 h-100">' +
+            '<div class="d-flex justify-content-between"><h5 class="mb-1">' + a.Title + '</h5>' + statusBadge + '</div>' +
+            '<p class="small text-muted mb-1">Tenggat: ' + new Date(a.DueDate).toLocaleString('id-ID') + '</p>' +
+            '<p class="small mb-0">' + (a.Instructions || '') + '</p>' +
+            (sub && sub.Score !== '' ? '<p class="fw-semibold mt-2 mb-0">Nilai: ' + sub.Score + '</p>' : '') +
+            (sub && sub.Feedback ? '<p class="small text-muted">' + sub.Feedback + '</p>' : '') +
+            actionButton +
+            '</div></div>';
+        }).join('');
+      }).listAssignmentsForStudent(session.token);
+    }
+
+    function loadManagerView() {
+      document.getElementById('loadingState').classList.add('d-none');
+      document.getElementById('managerView').classList.remove('d-none');
+
+      google.script.run.withSuccessHandler(function (assignments) {
+        var container = document.getElementById('managerList');
+        if (assignments.length === 0) {
+          container.innerHTML = '<p class="text-muted">Belum ada tugas yang dibuat.</p>';
+          return;
+        }
+        container.innerHTML = assignments.map(function (a) {
+          return '<div class="col-md-6"><div class="ea-card p-3 h-100">' +
+            '<h5 class="mb-1">' + a.Title + '</h5>' +
+            '<p class="small text-muted mb-2">Tenggat: ' + new Date(a.DueDate).toLocaleString('id-ID') + '</p>' +
+            '<p class="small mb-3">' + a.submissionCount + ' pengumpulan · ' + a.pendingCount + ' menunggu nilai</p>' +
+            '<button class="btn btn-sm btn-outline-primary" onclick="viewSubmissions(\'' + a.AssignmentID + '\', \'' + a.Title.replace(/'/g, "\\'") + '\')">Lihat Pengumpulan</button>' +
+            '</div></div>';
+        }).join('');
+      }).listMyCreatedAssignments(session.token);
+    }
+
+    function viewSubmissions(assignmentId, title) {
+      google.script.run.withSuccessHandler(function (submissions) {
+        var html = submissions.length === 0
+          ? '<p class="text-muted">Belum ada siswa yang mengumpulkan.</p>'
+          : '<div class="text-start">' + submissions.map(function (s) {
+              return '<div class="border-bottom py-2 d-flex justify-content-between align-items-center">' +
+                '<div><strong>' + s.studentName + '</strong>' +
+                (s.fileUrl ? ' — <a href="' + s.fileUrl + '" target="_blank">lihat file</a>' : '') +
+                (s.Score !== '' ? '<br><span class="small text-success">Nilai: ' + s.Score + '</span>' : '') + '</div>' +
+                '<button class="btn btn-sm btn-ea-secondary" onclick="gradeFlow(\'' + s.SubmissionID + '\')">Nilai</button>' +
+                '</div>';
+            }).join('') + '</div>';
+        Swal.fire({ title: title, html: html, confirmButtonText: 'Tutup', width: 600 });
+      }).listSubmissionsForAssignment(session.token, assignmentId);
+    }
+
+    function gradeFlow(submissionId) {
+      Swal.fire({
+        title: 'Beri Nilai',
+        html: '<input id="swalScore" type="number" class="form-control mb-2" placeholder="Nilai (0-100)">' +
+          '<textarea id="swalFeedback" class="form-control" placeholder="Catatan untuk siswa"></textarea>',
+        confirmButtonText: 'Simpan Nilai', showCancelButton: true
+      }).then(function (result) {
+        if (!result.isConfirmed) return;
+        var score = Number(document.getElementById('swalScore').value);
+        var feedback = document.getElementById('swalFeedback').value;
+        google.script.run.withSuccessHandler(function (res) {
+          if (res.success) { eaToast('success', 'Nilai disimpan'); loadManagerView(); }
+          else eaToast('error', res.message);
+        }).gradeSubmission(session.token, submissionId, score, feedback);
+      });
+    }
+
+    function createAssignmentFlow() {
+      Swal.fire({
+        title: 'Tugas Baru',
+        html:
+          '<input id="swalModuleId" class="form-control mb-2" placeholder="Module ID (contoh: MOD-X-01)">' +
+          '<input id="swalTitle" class="form-control mb-2" placeholder="Judul Tugas">' +
+          '<textarea id="swalInstructions" class="form-control mb-2" placeholder="Instruksi"></textarea>' +
+          '<input id="swalDueDate" type="datetime-local" class="form-control mb-2">' +
+          '<input id="swalMaxScore" type="number" class="form-control" placeholder="Nilai Maksimal" value="100">',
+        confirmButtonText: 'Buat', showCancelButton: true
+      }).then(function (result) {
+        if (!result.isConfirmed) return;
+        google.script.run.withSuccessHandler(function (res) {
+          if (res.success) eaToast('success', 'Tugas dibuat'); else eaToast('error', res.message);
+        }).createAssignment(session.token, {
+          moduleId: document.getElementById('swalModuleId').value,
+          title: document.getElementById('swalTitle').value,
+          instructions: document.getElementById('swalInstructions').value,
+          dueDate: document.getElementById('swalDueDate').value,
+          maxScore: Number(document.getElementById('swalMaxScore').value) || 100
+        });
+      });
+    }
+
+    function submitAssignmentFlow(assignmentId) {
+      var input = document.createElement('input');
+      input.type = 'file'; input.accept = 'application/pdf,image/*';
+      input.onchange = function () {
+        var file = input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var base64 = reader.result.split(',')[1];
+          google.script.run.withSuccessHandler(function (res) {
+            if (res.success) { eaToast('success', 'Tugas dikumpulkan'); loadStudentView(); }
+            else eaToast('error', res.message);
+          }).submitAssignment(session.token, assignmentId, base64, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  </script>
+</body>
+</html>

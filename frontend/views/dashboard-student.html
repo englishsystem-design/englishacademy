@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Dashboard Siswa — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4">
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+
+    <div id="contentState" class="d-none">
+      <h1 class="h3 mb-1">Selamat datang kembali!</h1>
+      <p class="text-muted mb-4">Berikut ringkasan progres belajarmu.</p>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+          <div class="ea-card ea-stat-card">
+            <div class="ea-stat-value" id="statProgress">-</div>
+            <div class="ea-stat-label">Progres Belajar</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="ea-card ea-stat-card">
+            <div class="ea-stat-value" id="statAttendance">-</div>
+            <div class="ea-stat-label">Kehadiran</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="ea-card ea-stat-card">
+            <div class="ea-stat-value" id="statCertificates">-</div>
+            <div class="ea-stat-label">Sertifikat</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="ea-card ea-stat-card">
+            <div class="ea-stat-value" id="statQuizCount">-</div>
+            <div class="ea-stat-label">Kuis Selesai</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="ea-card p-4 mb-4">
+            <h2 class="h5 mb-3">Nilai Kuis Terbaru</h2>
+            <canvas id="quizChart" height="120"></canvas>
+            <p id="quizEmptyState" class="text-muted small text-center py-4 d-none">Belum ada kuis yang dikerjakan. Mulai dari halaman Materi.</p>
+          </div>
+
+          <div class="ea-card p-4">
+            <h2 class="h5 mb-3">Pencapaian</h2>
+            <div id="achievementsList" class="d-flex flex-wrap gap-2"></div>
+            <p id="achievementsEmpty" class="text-muted small d-none">Belum ada pencapaian — terus belajar untuk membuka lencana pertamamu!</p>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="ea-card p-4 mb-4">
+            <h2 class="h5 mb-3">Progres Kurikulum</h2>
+            <div class="ea-progress mb-2"><div id="progressBar" style="width:0%;height:100%;"></div></div>
+            <p class="small text-muted mb-0" id="progressLabel"></p>
+          </div>
+
+          <div class="ea-card p-4">
+            <h2 class="h5 mb-3">Akses Cepat</h2>
+            <div class="d-grid gap-2">
+              <button class="btn btn-outline-primary text-start" onclick="eaNavigateTo('lessons')"><i class="bi bi-journal-text me-2"></i>Lanjutkan Belajar</button>
+              <button class="btn btn-outline-primary text-start" onclick="eaNavigateTo('ocr')"><i class="bi bi-camera me-2"></i>Scan Teks (OCR)</button>
+              <button class="btn btn-outline-primary text-start" onclick="eaNavigateTo('vocabulary')"><i class="bi bi-book me-2"></i>Kosakata Tersimpan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['student']);
+    if (session) {
+      eaRenderNav(session);
+
+      google.script.run
+        .withSuccessHandler(function (stats) {
+          document.getElementById('loadingState').classList.add('d-none');
+          document.getElementById('contentState').classList.remove('d-none');
+
+          if (!stats) {
+            eaToast('error', 'Profil siswa tidak ditemukan. Hubungi admin.');
+            return;
+          }
+
+          document.getElementById('statProgress').textContent = stats.learningProgressPercent + '%';
+          document.getElementById('statAttendance').textContent = stats.attendance.attendancePercentage + '%';
+          document.getElementById('statCertificates').textContent = stats.certificateCount;
+          document.getElementById('statQuizCount').textContent = stats.quizScores.length;
+
+          document.getElementById('progressBar').style.width = stats.learningProgressPercent + '%';
+          document.getElementById('progressLabel').textContent = stats.learningProgressPercent + '% modul telah kamu coba kerjakan kuis/ujiannya.';
+
+          if (stats.achievements.length === 0) {
+            document.getElementById('achievementsEmpty').classList.remove('d-none');
+          } else {
+            document.getElementById('achievementsList').innerHTML = stats.achievements.map(function (a) {
+              return '<span class="badge rounded-pill" style="background:var(--ea-accent);color:var(--ea-ink);padding:.6rem 1rem;"><i class="bi bi-star-fill me-1"></i>' + a.label + '</span>';
+            }).join('');
+          }
+
+          if (stats.quizScores.length === 0) {
+            document.getElementById('quizEmptyState').classList.remove('d-none');
+          } else {
+            new Chart(document.getElementById('quizChart'), {
+              type: 'line',
+              data: {
+                labels: stats.quizScores.map(function (s, i) { return 'Kuis ' + (i + 1); }),
+                datasets: [{ label: 'Skor (%)', data: stats.quizScores.map(function (s) { return s.Percentage; }),
+                  borderColor: '#00AEEF', backgroundColor: 'rgba(0,174,239,.15)', tension: .3, fill: true }]
+              },
+              options: { scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+            });
+          }
+        })
+        .withFailureHandler(function (err) {
+          document.getElementById('loadingState').classList.add('d-none');
+          eaToast('error', 'Gagal memuat dashboard.');
+          console.error(err);
+        })
+        .getStudentDashboardStats(session.token);
+    }
+  </script>
+</body>
+</html>

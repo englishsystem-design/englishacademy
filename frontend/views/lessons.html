@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Materi Pelajaran — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4">
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+
+    <div id="contentState" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+          <h1 class="h3 mb-1">Materi Pelajaran</h1>
+          <p class="text-muted mb-0">Kurikulum Merdeka — 43 modul, Kelas X sampai XII.</p>
+        </div>
+      </div>
+
+      <ul class="nav nav-pills mb-4" id="tingkatTabs"></ul>
+      <div id="modulesList" class="row g-3"></div>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['admin', 'teacher', 'student']);
+    var isManager = session && (session.role === 'admin' || session.role === 'teacher');
+    var activeTingkat = 'X';
+
+    if (session) {
+      eaRenderNav(session);
+      if (session.role === 'student') {
+        google.script.run.withSuccessHandler(function (profile) {
+          if (profile) { activeTingkat = profile.Kelas; }
+          loadModules();
+        }).getMyStudentProfile(session.token);
+      } else {
+        loadModules();
+      }
+      renderTingkatTabs();
+    }
+
+    function renderTingkatTabs() {
+      var tabs = ['X', 'XI', 'XII'];
+      document.getElementById('tingkatTabs').innerHTML = tabs.map(function (t) {
+        return '<li class="nav-item"><a class="nav-link" id="tab-' + t + '" href="#" onclick="switchTingkat(\'' + t + '\'); return false;">Kelas ' + t + '</a></li>';
+      }).join('');
+    }
+
+    function switchTingkat(t) {
+      activeTingkat = t;
+      loadModules();
+    }
+
+    function loadModules() {
+      document.querySelectorAll('#tingkatTabs .nav-link').forEach(function (el) { el.classList.remove('active'); });
+      var activeTab = document.getElementById('tab-' + activeTingkat);
+      if (activeTab) activeTab.classList.add('active');
+
+      google.script.run
+        .withSuccessHandler(function (modules) {
+          document.getElementById('loadingState').classList.add('d-none');
+          document.getElementById('contentState').classList.remove('d-none');
+          renderModules(modules);
+        })
+        .withFailureHandler(function (err) {
+          document.getElementById('loadingState').classList.add('d-none');
+          eaToast('error', 'Gagal memuat modul.');
+          console.error(err);
+        })
+        .listModules(session.token, activeTingkat);
+    }
+
+    function renderModules(modules) {
+      var container = document.getElementById('modulesList');
+      if (modules.length === 0) {
+        container.innerHTML = '<p class="text-muted">Belum ada modul untuk tingkat ini.</p>';
+        return;
+      }
+      container.innerHTML = modules.map(function (m) {
+        var statusBadge = m.Status === 'published'
+          ? '<span class="badge bg-success-subtle text-success">Terbit</span>'
+          : '<span class="badge bg-warning-subtle text-warning">Draft</span>';
+        return '<div class="col-md-6 col-lg-4">' +
+          '<div class="ea-card p-3 h-100 d-flex flex-column">' +
+          '<div class="d-flex justify-content-between align-items-start mb-2">' +
+          '<span class="ea-eyebrow">Modul ' + m.ModuleNumber + '</span>' + (isManager ? statusBadge : '') +
+          '</div>' +
+          '<h5 class="mb-2">' + m.ModuleTitle + '</h5>' +
+          '<p class="text-muted small flex-grow-1">' + (m.LearningObjectives || 'Belum ada deskripsi tujuan pembelajaran.') + '</p>' +
+          '<div class="d-flex gap-2 mt-2">' +
+          '<button class="btn btn-sm btn-outline-primary flex-grow-1" onclick="openModule(\'' + m.ModuleID + '\', \'' + m.ModuleTitle.replace(/'/g, "\\'") + '\')">Lihat Materi</button>' +
+          (isManager ? '<button class="btn btn-sm btn-outline-secondary" onclick="editModule(\'' + m.ModuleID + '\')"><i class="bi bi-pencil"></i></button>' : '') +
+          '</div></div></div>';
+      }).join('');
+    }
+
+    function openModule(moduleId, moduleTitle) {
+      google.script.run.withSuccessHandler(function (lessons) {
+        var html = lessons.length === 0
+          ? '<p class="text-muted">Belum ada materi di modul ini.' + (isManager ? '' : '') + '</p>'
+          : '<div class="list-group text-start">' + lessons.map(function (l) {
+              return '<a href="#" class="list-group-item list-group-item-action" onclick="eaNavigateTo(\'lesson-detail\', \'lessonId=' + l.LessonID + '\'); return false;">' + l.LessonTitle + '</a>';
+            }).join('') + '</div>';
+
+        Swal.fire({
+          title: moduleTitle,
+          html: html,
+          showCancelButton: isManager,
+          cancelButtonText: '+ Tambah Materi',
+          confirmButtonText: 'Tutup',
+          reverseButtons: true
+        }).then(function (result) {
+          if (result.dismiss === Swal.DismissReason.cancel) {
+            createLessonFlow(moduleId);
+          }
+        });
+      }).listLessonsByModule(session.token, moduleId);
+    }
+
+    function createLessonFlow(moduleId) {
+      Swal.fire({
+        title: 'Materi Baru', input: 'text', inputLabel: 'Judul materi',
+        showCancelButton: true, confirmButtonText: 'Buat'
+      }).then(function (result) {
+        if (!result.isConfirmed || !result.value) return;
+        google.script.run.withSuccessHandler(function (res) {
+          if (res.success) {
+            eaNavigateTo('lesson-detail', 'lessonId=' + res.lesson.LessonID);
+          } else {
+            eaToast('error', res.message);
+          }
+        }).createLesson(session.token, { moduleId: moduleId, lessonTitle: result.value });
+      });
+    }
+
+    function editModule(moduleId) {
+      google.script.run.withSuccessHandler(function (mod) {
+        Swal.fire({
+          title: 'Edit Modul: ' + mod.ModuleTitle,
+          html:
+            '<textarea id="swalObjectives" class="form-control mb-2" placeholder="Tujuan Pembelajaran">' + (mod.LearningObjectives || '') + '</textarea>' +
+            '<textarea id="swalOutcomes" class="form-control mb-2" placeholder="Capaian Pembelajaran">' + (mod.LearningOutcomes || '') + '</textarea>' +
+            '<select id="swalStatus" class="form-select">' +
+              '<option value="draft"' + (mod.Status === 'draft' ? ' selected' : '') + '>Draft</option>' +
+              '<option value="published"' + (mod.Status === 'published' ? ' selected' : '') + '>Terbit</option>' +
+            '</select>',
+          confirmButtonText: 'Simpan', showCancelButton: true
+        }).then(function (result) {
+          if (!result.isConfirmed) return;
+          google.script.run.withSuccessHandler(function (res) {
+            if (res.success) { eaToast('success', 'Modul diperbarui'); loadModules(); }
+            else { eaToast('error', res.message); }
+          }).updateModule(session.token, moduleId, {
+            LearningObjectives: document.getElementById('swalObjectives').value,
+            LearningOutcomes: document.getElementById('swalOutcomes').value,
+            Status: document.getElementById('swalStatus').value
+          });
+        });
+      }).getModule(session.token, moduleId);
+    }
+  </script>
+</body>
+</html>

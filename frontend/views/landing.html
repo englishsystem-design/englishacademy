@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+  <style>
+    .ea-hero { background: radial-gradient(1200px 500px at 80% -10%, rgba(0,174,239,.12), transparent), #fff; }
+    .ea-path-stage { fill: #fff; stroke-width: 3; }
+    .ea-path-stage-x { stroke: var(--ea-primary); }
+    .ea-path-stage-xi { stroke: var(--ea-secondary); }
+    .ea-path-stage-xii { stroke: var(--ea-accent); }
+    .ea-feature-icon {
+      width: 3rem; height: 3rem; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      background: rgba(0,174,239,.1); color: var(--ea-primary); font-size: 1.4rem;
+    }
+    .ea-testimonial { border-left: 4px solid var(--ea-secondary); }
+  </style>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+
+  <nav class="navbar navbar-expand ea-navbar px-3 px-lg-4 py-3">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+        <span class="ea-badge-kelas">EA</span> English<span>Academy</span>
+      </a>
+      <button class="btn btn-ea-primary" onclick="eaNavigateTo('login')">Masuk</button>
+    </div>
+  </nav>
+
+  <main id="ea-main">
+    <!-- Hero -->
+    <section class="ea-hero py-5">
+      <div class="container py-4">
+        <div class="row align-items-center g-5">
+          <div class="col-lg-6">
+            <p class="ea-eyebrow mb-2">Kurikulum Merdeka · Kelas X–XII</p>
+            <h1 class="display-5 ea-display mb-3">Belajar Bahasa Inggris,<br>jalur demi jalur, sampai mahir.</h1>
+            <p class="text-secondary fs-5 mb-4" style="color: var(--ea-ink-soft) !important;">
+              Materi, kuis, ujian, dan latihan bicara — semuanya dalam satu platform gratis,
+              dirancang khusus untuk siswa SMA di seluruh Indonesia.
+            </p>
+            <div class="d-flex gap-2">
+              <button class="btn btn-ea-primary btn-lg px-4" onclick="eaNavigateTo('login')">Masuk ke Akun</button>
+              <a href="#ea-curriculum" class="btn btn-outline-secondary btn-lg px-4">Lihat Kurikulum</a>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <!-- Signature element: the curriculum as a learning path, X -> XI -> XII -->
+            <svg viewBox="0 0 480 320" role="img" aria-label="Jalur belajar Kelas X menuju Kelas XII">
+              <path d="M 40 260 C 140 260 100 160 200 160 S 260 60 440 60" fill="none" stroke="#E7EEF2" stroke-width="10" stroke-linecap="round"/>
+              <circle class="ea-path-stage ea-path-stage-x" cx="40" cy="260" r="34"/>
+              <text x="40" y="266" text-anchor="middle" font-weight="700" font-size="20" fill="#1B2733">X</text>
+              <circle class="ea-path-stage ea-path-stage-xi" cx="200" cy="160" r="34"/>
+              <text x="200" y="166" text-anchor="middle" font-weight="700" font-size="20" fill="#1B2733">XI</text>
+              <circle class="ea-path-stage ea-path-stage-xii" cx="440" cy="60" r="34"/>
+              <text x="440" y="66" text-anchor="middle" font-weight="700" font-size="18" fill="#1B2733">XII</text>
+              <text x="40" y="312" text-anchor="middle" font-size="12" fill="#5B6B7A">16 modul</text>
+              <text x="200" y="212" text-anchor="middle" font-size="12" fill="#5B6B7A">15 modul</text>
+              <text x="440" y="112" text-anchor="middle" font-size="12" fill="#5B6B7A">12 modul</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="py-5">
+      <div class="container">
+        <p class="ea-eyebrow text-center">Fitur</p>
+        <h2 class="text-center mb-5">Semua yang kamu butuhkan untuk belajar mandiri</h2>
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <div class="ea-feature-icon mb-3"><i class="bi bi-camera"></i></div>
+              <h5>OCR Pintar</h5>
+              <p class="text-muted small mb-0">Foto halaman buku, ubah jadi teks yang bisa disalin dan diterjemahkan.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <div class="ea-feature-icon mb-3"><i class="bi bi-translate"></i></div>
+              <h5>Translator EN ⇄ ID</h5>
+              <p class="text-muted small mb-0">Terjemahkan kata atau kalimat kapan saja, langsung di dalam pelajaran.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <div class="ea-feature-icon mb-3"><i class="bi bi-mic"></i></div>
+              <h5>Latihan Bicara</h5>
+              <p class="text-muted small mb-0">Ucapkan kalimat, dapatkan skor pengucapan secara langsung di browser.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <div class="ea-feature-icon mb-3"><i class="bi bi-patch-check"></i></div>
+              <h5>Kuis & Ujian Otomatis</h5>
+              <p class="text-muted small mb-0">Nilai langsung keluar, dengan papan peringkat kelas untuk soal objektif.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <div class="ea-feature-icon mb-3"><i class="bi bi-book"></i></div>
+              <h5>Vocabulary Builder</h5>
+              <p class="text-muted small mb-0">Simpan kata baru lengkap dengan arti, sinonim, dan contoh kalimat.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <div class="ea-feature-icon mb-3"><i class="bi bi-award"></i></div>
+              <h5>Sertifikat Resmi</h5>
+              <p class="text-muted small mb-0">Sertifikat PDF dengan kode QR yang bisa diverifikasi siapa saja.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Curriculum -->
+    <section id="ea-curriculum" class="py-5" style="background:#fff;">
+      <div class="container">
+        <p class="ea-eyebrow text-center">Kurikulum</p>
+        <h2 class="text-center mb-5">Tersusun rapi untuk setiap tingkat</h2>
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <span class="ea-badge-kelas mb-3 d-inline-flex">X</span>
+              <h5>16 Modul Dasar</h5>
+              <p class="text-muted small">Greeting, Self Introduction, Narrative Text, Simple Present Tense, dan lainnya.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <span class="ea-badge-kelas mb-3 d-inline-flex">XI</span>
+              <h5>15 Modul Fungsional</h5>
+              <p class="text-muted small">Opinion, Formal Letter, Passive Voice, Conditional Sentences, dan lainnya.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="ea-card p-4 h-100">
+              <span class="ea-badge-kelas mb-3 d-inline-flex">XII</span>
+              <h5>12 Modul Persiapan</h5>
+              <p class="text-muted small">Job Application Letter, Debate, TOEFL & IELTS Preparation, dan lainnya.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Teacher -->
+    <section class="py-5">
+      <div class="container">
+        <div class="row align-items-center g-5">
+          <div class="col-lg-6">
+            <p class="ea-eyebrow">Untuk Guru</p>
+            <h2 class="mb-3">Buat materi sekali, pakai untuk semua kelas</h2>
+            <p class="text-muted">Editor teks kaya, bank soal otomatis, dan laporan nilai siap pakai — tanpa perlu kemampuan coding sama sekali.</p>
+          </div>
+          <div class="col-lg-6">
+            <div class="ea-card p-4">
+              <div class="d-flex justify-content-between mb-2"><span>Soal dinilai otomatis</span><strong>5 tipe</strong></div>
+              <div class="d-flex justify-content-between mb-2"><span>Waktu setup per kelas</span><strong>&lt; 5 menit</strong></div>
+              <div class="d-flex justify-content-between"><span>Biaya bulanan</span><strong class="text-success">Rp 0</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="py-5" style="background:#fff;">
+      <div class="container">
+        <p class="ea-eyebrow text-center">Testimoni</p>
+        <h2 class="text-center mb-5">Kata mereka yang sudah mencoba</h2>
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="ea-testimonial ps-3 py-2">
+              <p class="fst-italic">"Anak-anak jadi lebih semangat ngerjain kuis karena ada papan peringkat kelas."</p>
+              <p class="small text-muted mb-0">— Guru Bahasa Inggris, SMA Negeri</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="ea-testimonial ps-3 py-2">
+              <p class="fst-italic">"Fitur OCR-nya membantu banget pas aku scan halaman buku paket yang nggak ada PDF-nya."</p>
+              <p class="small text-muted mb-0">— Siswa Kelas XI</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="py-5">
+      <div class="container" style="max-width:760px;">
+        <p class="ea-eyebrow text-center">FAQ</p>
+        <h2 class="text-center mb-5">Pertanyaan umum</h2>
+        <div class="accordion" id="eaFaq">
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq1">Apakah platform ini gratis?</button></h3>
+            <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#eaFaq">
+              <div class="accordion-body">Ya, sepenuhnya gratis — dibangun di atas layanan Google yang tidak berbayar.</div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq2">Bagaimana cara mendapatkan akun?</button></h3>
+            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#eaFaq">
+              <div class="accordion-body">Akun dibuat oleh admin sekolah Anda. Hubungi guru atau admin sekolah untuk mendapatkan username dan password.</div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq3">Bisa diakses lewat HP?</button></h3>
+            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#eaFaq">
+              <div class="accordion-body">Bisa. Tampilan menyesuaikan otomatis untuk layar HP, tablet, maupun laptop.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section class="py-5" style="background:#fff;">
+      <div class="container text-center" style="max-width:600px;">
+        <p class="ea-eyebrow">Kontak</p>
+        <h2 class="mb-3">Sekolah Anda ingin bergabung?</h2>
+        <p class="text-muted">Hubungi admin English Academy Indonesia di sekolah Anda, atau lihat panduan pemasangan di repositori GitHub proyek ini.</p>
+      </div>
+    </section>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+</body>
+</html>

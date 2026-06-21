@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Materi — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+  <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4" style="max-width:860px;">
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+
+    <div id="contentState" class="d-none">
+      <a href="#" class="small mb-2 d-inline-block" onclick="eaNavigateTo('lessons'); return false;">&larr; Kembali ke Materi</a>
+      <h1 class="h3 mb-3" id="lessonTitle"></h1>
+
+      <!-- Student read-only view -->
+      <div id="readView" class="d-none">
+        <div class="ea-card p-4 mb-4" id="readContent"></div>
+
+        <div id="pdfSection" class="ea-card p-4 mb-4 d-none">
+          <h2 class="h6 mb-3"><i class="bi bi-file-earmark-pdf me-1"></i>Materi PDF</h2>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="pdfPrevPage()">&larr; Sebelumnya</button>
+            <span class="small text-muted" id="pdfPageIndicator"></span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="pdfNextPage()">Selanjutnya &rarr;</button>
+          </div>
+          <canvas id="pdfCanvas" class="w-100 border rounded"></canvas>
+        </div>
+
+        <div id="videoSection" class="ea-card p-4 d-none">
+          <h2 class="h6 mb-3"><i class="bi bi-play-circle me-1"></i>Video</h2>
+          <div id="videoContainer" class="ratio ratio-16x9"></div>
+        </div>
+      </div>
+
+      <!-- Teacher/Admin edit view -->
+      <div id="editView" class="d-none">
+        <div class="ea-card p-3 mb-3">
+          <div id="quillEditor" style="min-height:260px;"></div>
+        </div>
+        <button class="btn btn-ea-primary mb-4" onclick="saveLessonContent()">Simpan Materi</button>
+
+        <div class="ea-card p-4 mb-3">
+          <h2 class="h6 mb-2">Unggah PDF</h2>
+          <input type="file" id="pdfInput" accept="application/pdf" class="form-control">
+          <button class="btn btn-sm btn-outline-primary mt-2" onclick="uploadPdf()">Unggah</button>
+        </div>
+
+        <div class="ea-card p-4">
+          <h2 class="h6 mb-2">Tambah Video</h2>
+          <select id="videoSourceType" class="form-select mb-2">
+            <option value="youtube">Tautan YouTube</option>
+            <option value="drive">Unggah File Video</option>
+          </select>
+          <input type="text" id="youtubeUrlInput" class="form-control mb-2" placeholder="https://youtube.com/watch?v=...">
+          <input type="file" id="videoFileInput" accept="video/*" class="form-control mb-2 d-none">
+          <button class="btn btn-sm btn-outline-primary" onclick="attachVideo()">Simpan Video</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['admin', 'teacher', 'student']);
+    var isManager = session && (session.role === 'admin' || session.role === 'teacher');
+    var lessonId, quill, pdfDoc, pdfCurrentPage = 1;
+
+    document.getElementById('videoSourceType').addEventListener('change', function () {
+      var isYoutube = this.value === 'youtube';
+      document.getElementById('youtubeUrlInput').classList.toggle('d-none', !isYoutube);
+      document.getElementById('videoFileInput').classList.toggle('d-none', isYoutube);
+    });
+
+    if (session) {
+      eaRenderNav(session);
+      eaGetUrlParams(function (params) {
+        lessonId = params.lessonId;
+        if (!lessonId) {
+          document.getElementById('loadingState').classList.add('d-none');
+          eaToast('error', 'ID materi tidak ditemukan di tautan ini.');
+          return;
+        }
+        loadLesson();
+      });
+    }
+
+    function loadLesson() {
+      google.script.run
+        .withSuccessHandler(function (lesson) {
+          document.getElementById('loadingState').classList.add('d-none');
+          document.getElementById('contentState').classList.remove('d-none');
+          document.getElementById('lessonTitle').textContent = lesson.LessonTitle;
+
+          if (isManager) {
+            document.getElementById('editView').classList.remove('d-none');
+            quill = new Quill('#quillEditor', { theme: 'snow' });
+            quill.root.innerHTML = lesson.ContentHTML || '';
+          } else {
+            document.getElementById('readView').classList.remove('d-none');
+            document.getElementById('readContent').innerHTML = lesson.ContentHTML || '<p class="text-muted">Belum ada konten.</p>';
+
+            if (lesson.pdfUrl) {
+              document.getElementById('pdfSection').classList.remove('d-none');
+              loadPdf(lesson.pdfUrl);
+            }
+            if (lesson.video) {
+              document.getElementById('videoSection').classList.remove('d-none');
+              renderVideo(lesson.video);
+            }
+          }
+        })
+        .withFailureHandler(function (err) {
+          document.getElementById('loadingState').classList.add('d-none');
+          eaToast('error', 'Materi tidak ditemukan atau belum tersedia.');
+          console.error(err);
+        })
+        .getLesson(session.token, lessonId);
+    }
+
+    function saveLessonContent() {
+      google.script.run.withSuccessHandler(function (res) {
+        if (res.success) eaToast('success', 'Materi disimpan'); else eaToast('error', res.message);
+      }).updateLesson(session.token, lessonId, { ContentHTML: quill.root.innerHTML });
+    }
+
+    function uploadPdf() {
+      var file = document.getElementById('pdfInput').files[0];
+      if (!file) { eaToast('error', 'Pilih file PDF terlebih dahulu.'); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var base64 = reader.result.split(',')[1];
+        google.script.run.withSuccessHandler(function (res) {
+          if (res.success) eaToast('success', 'PDF diunggah'); else eaToast('error', res.message);
+        }).uploadLessonPDF(session.token, lessonId, base64, file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function attachVideo() {
+      var sourceType = document.getElementById('videoSourceType').value;
+      if (sourceType === 'youtube') {
+        var url = document.getElementById('youtubeUrlInput').value.trim();
+        if (!url) { eaToast('error', 'Masukkan tautan YouTube.'); return; }
+        google.script.run.withSuccessHandler(function (res) {
+          if (res.success) eaToast('success', 'Video ditambahkan'); else eaToast('error', res.message);
+        }).attachLessonVideo(session.token, lessonId, { sourceType: 'youtube', externalUrl: url });
+      } else {
+        var file = document.getElementById('videoFileInput').files[0];
+        if (!file) { eaToast('error', 'Pilih file video.'); return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+          var base64 = reader.result.split(',')[1];
+          google.script.run.withSuccessHandler(function (res) {
+            if (res.success) eaToast('success', 'Video diunggah'); else eaToast('error', res.message);
+          }).attachLessonVideo(session.token, lessonId, { sourceType: 'drive', base64Data: base64, fileName: file.name, mimeType: file.type });
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function renderVideo(video) {
+      var container = document.getElementById('videoContainer');
+      if (video.sourceType === 'youtube') {
+        var idMatch = video.url.match(/(?:v=|youtu\.be\/)([^&]+)/);
+        var embedId = idMatch ? idMatch[1] : '';
+        container.innerHTML = '<iframe src="https://www.youtube.com/embed/' + embedId + '" allowfullscreen></iframe>';
+      } else {
+        container.innerHTML = '<video controls class="w-100" src="' + video.url + '"></video>';
+      }
+    }
+
+    // ── PDF.js viewer ──────────────────────────────────────────────
+    function loadPdf(url) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfjsLib.getDocument(url).promise.then(function (doc) {
+        pdfDoc = doc;
+        pdfCurrentPage = 1;
+        renderPdfPage();
+      }).catch(function (err) {
+        document.getElementById('pdfSection').innerHTML = '<p class="text-muted small">Tidak dapat memuat pratinjau PDF. <a href="' + url + '" target="_blank">Buka file PDF</a>.</p>';
+        console.error(err);
+      });
+    }
+
+    function renderPdfPage() {
+      pdfDoc.getPage(pdfCurrentPage).then(function (page) {
+        var canvas = document.getElementById('pdfCanvas');
+        var viewport = page.getViewport({ scale: 1.3 });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+        document.getElementById('pdfPageIndicator').textContent = 'Halaman ' + pdfCurrentPage + ' / ' + pdfDoc.numPages;
+      });
+    }
+
+    function pdfPrevPage() { if (pdfDoc && pdfCurrentPage > 1) { pdfCurrentPage--; renderPdfPage(); } }
+    function pdfNextPage() { if (pdfDoc && pdfCurrentPage < pdfDoc.numPages) { pdfCurrentPage++; renderPdfPage(); } }
+  </script>
+</body>
+</html>

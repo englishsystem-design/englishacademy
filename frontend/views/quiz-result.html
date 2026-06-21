@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Hasil Kuis — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4" style="max-width:760px;">
+    <h1 class="h3 mb-4">Papan Peringkat</h1>
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+
+    <div class="ea-card p-4 d-none" id="resultCard">
+      <table class="table">
+        <thead><tr><th>#</th><th>Nama</th><th class="text-end">Nilai</th><th class="text-end">Waktu</th></tr></thead>
+        <tbody id="leaderboardBody"></tbody>
+      </table>
+      <p id="leaderboardEmpty" class="text-muted small text-center d-none">Belum ada yang mengerjakan kuis ini.</p>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['admin', 'teacher', 'student']);
+
+    if (session) {
+      eaRenderNav(session);
+      eaGetUrlParams(function (params) {
+        var quizId = params.quizId;
+        if (!quizId) {
+          document.getElementById('loadingState').classList.add('d-none');
+          eaToast('error', 'ID kuis tidak ditemukan.');
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function (ranked) {
+            document.getElementById('loadingState').classList.add('d-none');
+            document.getElementById('resultCard').classList.remove('d-none');
+            if (ranked.length === 0) {
+              document.getElementById('leaderboardEmpty').classList.remove('d-none');
+              return;
+            }
+            document.getElementById('leaderboardBody').innerHTML = ranked.map(function (r, i) {
+              var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+              return '<tr><td>' + medal + '</td><td>' + r.fullName + '</td>' +
+                '<td class="text-end fw-semibold">' + r.percentage + '%</td>' +
+                '<td class="text-end text-muted small">' + r.timeTakenSeconds + 's</td></tr>';
+            }).join('');
+          })
+          .withFailureHandler(function (err) {
+            document.getElementById('loadingState').classList.add('d-none');
+            eaToast('error', 'Gagal memuat papan peringkat.');
+            console.error(err);
+          })
+          .getQuizLeaderboard(session.token, quizId, 20);
+      });
+    }
+  </script>
+</body>
+</html>

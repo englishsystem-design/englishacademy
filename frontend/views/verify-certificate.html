@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Verifikasi Sertifikat — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <nav class="navbar ea-navbar px-3 px-lg-4 py-3">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="#" onclick="eaNavigateTo('landing'); return false;">
+        <span class="ea-badge-kelas">EA</span> English<span>Academy</span>
+      </a>
+    </div>
+  </nav>
+
+  <main id="ea-main" class="container py-5 d-flex justify-content-center">
+    <div style="max-width:480px;width:100%;">
+      <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+      <div id="resultCard" class="ea-card p-4 text-center d-none"></div>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var card = document.getElementById('resultCard');
+
+    eaGetUrlParams(function (params) {
+      var token = params.token;
+
+      if (!token) {
+        document.getElementById('loadingState').classList.add('d-none');
+        card.classList.remove('d-none');
+        card.innerHTML = '<p class="text-muted">Kode verifikasi tidak ditemukan di tautan ini.</p>';
+        return;
+      }
+
+      // Public endpoint — no session/token required, see Certificate.gs::verifyCertificate
+      google.script.run
+        .withSuccessHandler(function (result) {
+          document.getElementById('loadingState').classList.add('d-none');
+          card.classList.remove('d-none');
+
+          if (!result.valid) {
+            card.innerHTML = '<i class="bi bi-x-circle text-danger" style="font-size:2.5rem;"></i>' +
+              '<h2 class="h5 mt-2">' + (result.message || 'Sertifikat tidak valid') + '</h2>';
+            return;
+          }
+
+          card.innerHTML =
+            '<i class="bi bi-patch-check-fill text-success" style="font-size:2.5rem;"></i>' +
+            '<h2 class="h5 mt-2 mb-3">Sertifikat Valid</h2>' +
+            '<p class="mb-1"><strong>' + result.studentName + '</strong></p>' +
+            '<p class="text-muted mb-1">' + result.moduleTitle + '</p>' +
+            '<p class="small text-muted mb-1">No. ' + result.certificateNumber + '</p>' +
+            '<p class="small text-muted">Diterbitkan ' + new Date(result.issueDate).toLocaleDateString('id-ID') + '</p>';
+        })
+        .withFailureHandler(function () {
+          document.getElementById('loadingState').classList.add('d-none');
+          card.classList.remove('d-none');
+          card.innerHTML = '<p class="text-muted">Gagal memverifikasi sertifikat. Coba lagi nanti.</p>';
+        })
+        .verifyCertificate(token);
+    });
+  </script>
+</body>
+</html>

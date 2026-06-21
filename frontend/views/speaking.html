@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Latihan Bicara — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4" style="max-width:700px;">
+    <h1 class="h3 mb-1">Latihan Bicara</h1>
+    <p class="text-muted mb-4">Baca kalimat di bawah dengan suara nyaring, lalu lihat seberapa dekat pengucapanmu.</p>
+
+    <div class="ea-card p-4 text-center mb-4">
+      <p class="ea-eyebrow">Ucapkan kalimat ini</p>
+      <h2 class="h4 mb-3" id="targetSentence">She sells seashells by the seashore.</h2>
+      <button class="btn btn-outline-secondary btn-sm mb-3" onclick="newSentence()">Ganti Kalimat</button>
+      <div>
+        <button class="btn btn-ea-primary btn-lg rounded-circle" id="micButton" onclick="toggleListening()" style="width:80px;height:80px;">
+          <i class="bi bi-mic-fill fs-3"></i>
+        </button>
+      </div>
+      <p class="small text-muted mt-2" id="micStatus">Tekan tombol mikrofon untuk mulai.</p>
+    </div>
+
+    <div id="resultCard" class="ea-card p-4 d-none">
+      <p class="mb-1"><strong>Yang terdengar:</strong> <span id="heardText"></span></p>
+      <div class="ea-progress my-2"><div id="scoreBar" style="width:0%;height:100%;"></div></div>
+      <p class="text-center fw-semibold" id="scoreLabel"></p>
+    </div>
+
+    <div id="unsupportedNotice" class="alert alert-warning d-none">
+      Browser ini tidak mendukung Web Speech API. Coba gunakan Google Chrome versi terbaru.
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['student']);
+    if (session) eaRenderNav(session);
+
+    var sentences = [
+      'She sells seashells by the seashore.',
+      'How much wood would a woodchuck chuck?',
+      'I have a meeting at nine o\'clock tomorrow.',
+      'The weather is beautiful today, isn\'t it?',
+      'Could you please help me with my homework?'
+    ];
+
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recognition, listening = false;
+
+    if (!SpeechRecognition) {
+      document.getElementById('unsupportedNotice').classList.remove('d-none');
+      document.getElementById('micButton').disabled = true;
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+
+      recognition.onresult = function (event) {
+        var heard = event.results[0][0].transcript;
+        showResult(heard);
+      };
+      recognition.onerror = function () {
+        document.getElementById('micStatus').textContent = 'Tidak terdengar. Coba lagi.';
+        setListeningUi(false);
+      };
+      recognition.onend = function () { setListeningUi(false); };
+    }
+
+    function newSentence() {
+      var s = sentences[Math.floor(Math.random() * sentences.length)];
+      document.getElementById('targetSentence').textContent = s;
+      document.getElementById('resultCard').classList.add('d-none');
+    }
+
+    function toggleListening() {
+      if (!recognition) return;
+      if (listening) { recognition.stop(); return; }
+      recognition.start();
+      setListeningUi(true);
+    }
+
+    function setListeningUi(isListening) {
+      listening = isListening;
+      document.getElementById('micButton').classList.toggle('btn-ea-primary', !isListening);
+      document.getElementById('micButton').classList.toggle('btn-danger', isListening);
+      document.getElementById('micStatus').textContent = isListening ? 'Mendengarkan...' : 'Tekan tombol mikrofon untuk mulai.';
+    }
+
+    function showResult(heard) {
+      var target = document.getElementById('targetSentence').textContent;
+      var score = similarityScore(normalize(target), normalize(heard));
+
+      document.getElementById('resultCard').classList.remove('d-none');
+      document.getElementById('heardText').textContent = heard;
+      document.getElementById('scoreBar').style.width = score + '%';
+      document.getElementById('scoreLabel').textContent = score + '% mirip — ' +
+        (score >= 85 ? 'Bagus sekali!' : score >= 60 ? 'Lumayan, coba lagi.' : 'Coba ucapkan lebih jelas.');
+    }
+
+    function normalize(text) {
+      return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    }
+
+    // Simple word-overlap similarity — adequate for pronunciation practice
+    // feedback; not a phonetic comparison, which Web Speech API doesn't expose.
+    function similarityScore(a, b) {
+      var wordsA = a.split(/\s+/), wordsB = b.split(/\s+/);
+      var matches = wordsA.filter(function (w) { return wordsB.indexOf(w) !== -1; }).length;
+      return Math.round((matches / wordsA.length) * 100);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <title>Kehadiran — English Academy Indonesia</title>
+  <?!= include('partials/head'); ?>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <?!= include('partials/navbar'); ?>
+
+  <main id="ea-main" class="container py-4">
+    <h1 class="h3 mb-1">Kehadiran</h1>
+    <p class="text-muted mb-4">Tandai kehadiran siswa per kelas, atau terbitkan sertifikat penyelesaian modul.</p>
+
+    <div class="ea-card p-4 mb-4">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small">Kelas</label>
+          <select id="classSelect" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Tanggal</label>
+          <input type="date" id="attendanceDate" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-ea-primary w-100" onclick="loadRoster()">Muat Daftar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="rosterCard" class="ea-card p-4 d-none">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Nama</th><th>Status Kehadiran</th><th class="text-end">Aksi Lain</th></tr></thead>
+          <tbody id="rosterBody"></tbody>
+        </table>
+      </div>
+      <button class="btn btn-ea-secondary" onclick="saveAttendance()">Simpan Kehadiran</button>
+    </div>
+  </main>
+
+  <?!= include('partials/footer'); ?>
+
+  <script>
+    var session = eaRequireLogin(['admin', 'teacher']);
+    var currentRoster = [];
+
+    if (session) {
+      eaRenderNav(session);
+      document.getElementById('attendanceDate').valueAsDate = new Date();
+      loadClasses();
+
+      eaGetUrlParams(function (params) {
+        if (params.classId) {
+          setTimeout(function () {
+            document.getElementById('classSelect').value = params.classId;
+            loadRoster();
+          }, 500);
+        }
+      });
+    }
+
+    function loadClasses() {
+      google.script.run.withSuccessHandler(function (classes) {
+        document.getElementById('classSelect').innerHTML = classes.map(function (c) {
+          return '<option value="' + c.ClassID + '">' + c.ClassName + ' (Kelas ' + c.Tingkat + ')</option>';
+        }).join('');
+      }).listClasses(session.token, {});
+    }
+
+    function loadRoster() {
+      var classId = document.getElementById('classSelect').value;
+      var date = document.getElementById('attendanceDate').value;
+      if (!classId || !date) { eaToast('error', 'Pilih kelas dan tanggal.'); return; }
+      loadRosterData(classId, date);
+    }
+
+    // google.script.run doesn't support Promise.all, so two calls are
+    // combined manually: first fetch students, then attendance for that date.
+    function loadRosterData(classId, date) {
+      google.script.run.withSuccessHandler(function (students) {
+        google.script.run.withSuccessHandler(function (attendance) {
+          renderRoster(students, attendance);
+        }).getAttendanceByClassDate(session.token, classId, date);
+      }).listStudentsByClass(session.token, classId);
+    }
+
+    function renderRoster(students, existingAttendance) {
+      currentRoster = students;
+      var attendanceByStudent = {};
+      existingAttendance.forEach(function (a) { attendanceByStudent[a.StudentID] = a.Status; });
+
+      document.getElementById('rosterCard').classList.remove('d-none');
+      document.getElementById('rosterBody').innerHTML = students.map(function (s) {
+        var current = attendanceByStudent[s.StudentID] || 'present';
+        var options = ['present', 'absent', 'sick', 'permit'].map(function (st) {
+          return '<option value="' + st + '"' + (st === current ? ' selected' : '') + '>' + st + '</option>';
+        }).join('');
+        return '<tr data-student-id="' + s.StudentID + '">' +
+          '<td>' + s.fullName + '</td>' +
+          '<td><select class="form-select form-select-sm attendance-status">' + options + '</select></td>' +
+          '<td class="text-end"><button class="btn btn-sm btn-outline-secondary" onclick="issueCertFlow(\'' + s.StudentID + '\')">Terbitkan Sertifikat</button></td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    function saveAttendance() {
+      var classId = document.getElementById('classSelect').value;
+      var date = document.getElementById('attendanceDate').value;
+      var records = [];
+      document.querySelectorAll('#rosterBody tr').forEach(function (row) {
+        records.push({ studentId: row.getAttribute('data-student-id'), status: row.querySelector('.attendance-status').value });
+      });
+
+      google.script.run.withSuccessHandler(function (res) {
+        if (res.success) eaToast('success', 'Kehadiran disimpan'); else eaToast('error', res.message);
+      }).markAttendanceBulk(session.token, classId, date, records);
+    }
+
+    function issueCertFlow(studentId) {
+      Swal.fire({
+        title: 'Terbitkan Sertifikat',
+        input: 'text', inputLabel: 'Module ID (contoh: MOD-X-01)',
+        confirmButtonText: 'Terbitkan', showCancelButton: true
+      }).then(function (result) {
+        if (!result.isConfirmed || !result.value) return;
+        google.script.run.withSuccessHandler(function (res) {
+          if (res.success) eaToast('success', 'Sertifikat diterbitkan: ' + res.certificate.CertificateNumber);
+          else eaToast('error', res.message);
+        }).issueCertificate(session.token, studentId, result.value);
+      });
+    }
+  </script>
+</body>
+</html>
