@@ -8,5 +8,5 @@
  * edit to connect the GitHub Pages frontend to your Apps Script backend.
  */
 window.EA_CONFIG = {
-  API_URL: 'PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE'
+  API_URL: 'https://script.google.com/macros/s/AKfycbzPRAzAeNQbWUy9yMkNLjLvEPzRnCOtIUCMkKLIwzsQGwRGeTEu3gynWxk5d6uq1qP0Ag/exec'
 };
