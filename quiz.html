@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kuis — English Academy Indonesia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/custom.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <div id="ea-navbar"></div>
+  <main id="ea-main" class="container py-4" style="max-width:760px;">
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+    <div id="errorState" class="ea-card p-4 text-center d-none">
+      <p class="mb-0" id="errorMessage"></p>
+      <a href="lessons.html" class="btn btn-outline-primary mt-3">Kembali ke Materi</a>
+    </div>
+    <div id="quizState" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0" id="quizTitle"></h1>
+        <span class="badge bg-light text-dark" id="attemptInfo"></span>
+      </div>
+      <p class="text-muted" id="quizInstructions"></p>
+      <div id="questionsContainer"></div>
+      <button class="btn btn-ea-primary px-4" onclick="submitQuiz()">Kumpulkan Jawaban</button>
+    </div>
+    <div id="resultState" class="d-none text-center">
+      <div class="ea-card p-5">
+        <h1 class="display-5" id="resultPercentage"></h1>
+        <p class="text-muted" id="resultPassStatus"></p>
+        <a href="lessons.html" class="btn btn-ea-primary mt-3">Kembali ke Materi</a>
+      </div>
+    </div>
+  </main>
+  <div id="ea-footer"></div>
+  <script src="config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    var session = eaRequireLogin(['student']);
+    var params = eaGetUrlParams();
+    var quizId = params.quizId;
+    var startTime = Date.now();
+    var currentAttemptId, currentQuiz;
+
+    if (session) {
+      eaIncludeHTML('#ea-navbar', 'partials/navbar.html', function () { eaRenderNav(session); });
+      eaIncludeHTML('#ea-footer', 'partials/footer.html');
+      if (!quizId) { showError('ID kuis tidak ditemukan di tautan ini.'); }
+      else {
+        EA.api('getQuizForAttempt', [session.token, quizId])
+          .then(function (data) {
+            document.getElementById('loadingState').classList.add('d-none');
+            document.getElementById('quizState').classList.remove('d-none');
+            currentAttemptId = data.attemptId; currentQuiz = data.quiz;
+            document.getElementById('quizTitle').textContent = data.quiz.Title;
+            document.getElementById('quizInstructions').textContent = data.quiz.Instructions || '';
+            document.getElementById('attemptInfo').textContent = 'Percobaan ke-' + data.attemptNumber + ' (sisa ' + data.attemptsRemaining + ')';
+            document.getElementById('questionsContainer').innerHTML = data.questions.map(function (q, i) { return renderQ(q, i); }).join('');
+          })
+          .catch(function (err) { showError((err && err.message) || 'Kuis tidak tersedia.'); });
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').classList.add('d-none');
+      document.getElementById('errorState').classList.remove('d-none');
+      document.getElementById('errorMessage').textContent = msg;
+    }
+
+    function renderQ(q, idx) {
+      var h = '<div class="ea-card p-4 mb-3"><p class="fw-semibold mb-3">' + (idx+1) + '. ' + q.QuestionText + '</p>';
+      if (q.QuestionType === 'mc' || q.QuestionType === 'tf') {
+        var opts = q.QuestionType === 'tf' ? ['True','False'] : (q.Options.choices||[]);
+        h += opts.map(function (o) { return '<div class="form-check"><input class="form-check-input" type="radio" name="q_' + q.QuestionID + '" value="' + o + '"><label class="form-check-label">' + o + '</label></div>'; }).join('');
+      } else if (q.QuestionType === 'mr') {
+        h += (q.Options.choices||[]).map(function (o) { return '<div class="form-check"><input class="form-check-input" type="checkbox" name="q_' + q.QuestionID + '" value="' + o + '"><label class="form-check-label">' + o + '</label></div>'; }).join('');
+      } else if (q.QuestionType === 'fillblank') {
+        h += '<input type="text" class="form-control" name="q_' + q.QuestionID + '" placeholder="Jawabanmu...">';
+      } else if (q.QuestionType === 'essay') {
+        h += '<textarea class="form-control" name="q_' + q.QuestionID + '" rows="4" placeholder="Tulis jawabanmu..."></textarea><p class="small text-muted mt-1">Dinilai manual oleh guru.</p>';
+      } else if (q.QuestionType === 'matching') {
+        h += '<p class="small text-muted">Format: kiri=kanan, satu per baris</p><textarea class="form-control" name="q_' + q.QuestionID + '" rows="3" placeholder="1=A&#10;2=B"></textarea>';
+      }
+      return h + '</div>';
+    }
+
+    function collectAnswers() {
+      var answers = [], seen = {};
+      document.querySelectorAll('[name^="q_"]').forEach(function (el) {
+        var qId = el.name.replace('q_','');
+        if (seen[qId]) return; seen[qId] = true;
+        var ans;
+        if (el.type === 'radio') { var c = document.querySelector('[name="' + el.name + '"]:checked'); ans = { selected: c ? c.value : null }; }
+        else if (el.type === 'checkbox') { var cs = document.querySelectorAll('[name="' + el.name + '"]:checked'); ans = { selected: Array.from(cs).map(function (x) { return x.value; }) }; }
+        else if (el.tagName === 'TEXTAREA') {
+          if (el.rows <= 3) { var p = {}; el.value.split('\n').forEach(function (l) { var s = l.split('='); if (s.length===2) p[s[0].trim()]=s[1].trim(); }); ans = { pairs: p }; }
+          else { ans = { text: el.value }; }
+        } else { ans = { text: el.value }; }
+        answers.push({ questionId: qId, studentAnswer: ans });
+      });
+      return answers;
+    }
+
+    function submitQuiz() {
+      var timeTaken = Math.round((Date.now() - startTime) / 1000);
+      EA.api('submitQuizAttempt', [session.token, quizId, currentAttemptId, collectAnswers(), timeTaken])
+        .then(function (res) {
+          if (!res.success) { eaToast('error', res.message); return; }
+          document.getElementById('quizState').classList.add('d-none');
+          document.getElementById('resultState').classList.remove('d-none');
+          document.getElementById('resultPercentage').textContent = res.score.Percentage + '%';
+          document.getElementById('resultPassStatus').textContent = res.passed ? 'Selamat, kamu lulus passing score!' : 'Belum mencapai passing score. Coba lagi jika masih ada kesempatan.';
+        })
+        .catch(function (err) { eaToast('error', 'Gagal mengumpulkan jawaban.'); console.error(err); });
+    }
+  </script>
+</body>
+</html>

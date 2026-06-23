@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verifikasi Sertifikat — English Academy Indonesia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/custom.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar ea-navbar px-3 px-lg-4 py-3">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="index.html">
+        <span class="ea-badge-kelas">EA</span> English<span>Academy</span>
+      </a>
+    </div>
+  </nav>
+  <main class="container py-5 d-flex justify-content-center">
+    <div style="max-width:480px;width:100%;">
+      <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+      <div id="resultCard" class="ea-card p-4 text-center d-none"></div>
+    </div>
+  </main>
+  <script src="config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    var token = eaGetUrlParams().token;
+    var card = document.getElementById('resultCard');
+
+    if (!token) {
+      document.getElementById('loadingState').classList.add('d-none');
+      card.classList.remove('d-none');
+      card.innerHTML = '<p class="text-muted">Kode verifikasi tidak ditemukan di tautan ini.</p>';
+    } else {
+      // Public endpoint — no login required, see Certificate.gs::verifyCertificate
+      EA.api('verifyCertificate', [token])
+        .then(function (result) {
+          document.getElementById('loadingState').classList.add('d-none');
+          card.classList.remove('d-none');
+          if (!result.valid) {
+            card.innerHTML = '<i class="bi bi-x-circle text-danger" style="font-size:2.5rem;"></i>' +
+              '<h2 class="h5 mt-2">' + (result.message || 'Sertifikat tidak valid') + '</h2>';
+            return;
+          }
+          card.innerHTML =
+            '<i class="bi bi-patch-check-fill text-success" style="font-size:2.5rem;"></i>' +
+            '<h2 class="h5 mt-2 mb-3">Sertifikat Valid</h2>' +
+            '<p class="mb-1"><strong>' + result.studentName + '</strong></p>' +
+            '<p class="text-muted mb-1">' + result.moduleTitle + '</p>' +
+            '<p class="small text-muted mb-1">No. ' + result.certificateNumber + '</p>' +
+            '<p class="small text-muted">Diterbitkan ' + new Date(result.issueDate).toLocaleDateString('id-ID') + '</p>';
+        })
+        .catch(function () {
+          document.getElementById('loadingState').classList.add('d-none');
+          card.classList.remove('d-none');
+          card.innerHTML = '<p class="text-muted">Gagal memverifikasi sertifikat. Coba lagi nanti.</p>';
+        });
+    }
+  </script>
+</body>
+</html>

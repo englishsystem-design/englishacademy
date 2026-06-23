@@ -1,0 +1,4 @@
+# GitHub Pages config for English Academy Indonesia
+# This disables Jekyll processing so plain HTML files are served as-is,
+# and asset folders aren't filtered out.
+theme: null

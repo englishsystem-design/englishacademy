@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tugas — English Academy Indonesia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/css/custom.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <a href="#ea-main" class="skip-link">Langsung ke konten</a>
+  <div id="ea-navbar"></div>
+  <main id="ea-main" class="container py-4">
+    <h1 class="h3 mb-1">Tugas</h1>
+    <div id="loadingState" class="ea-loading"><div class="spinner-border text-primary" role="status"></div></div>
+    <!-- Student view -->
+    <div id="studentView" class="d-none row g-3"></div>
+    <!-- Teacher/Admin view -->
+    <div id="managerView" class="d-none">
+      <button class="btn btn-ea-primary mb-3" onclick="createAssignmentFlow()"><i class="bi bi-plus-lg me-1"></i>Buat Tugas Baru</button>
+      <div id="managerList" class="row g-3"></div>
+    </div>
+  </main>
+  <div id="ea-footer"></div>
+  <script src="config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    var session = eaRequireLogin(['admin', 'teacher', 'student']);
+    if (session) {
+      eaIncludeHTML('#ea-navbar', 'partials/navbar.html', function () { eaRenderNav(session); });
+      eaIncludeHTML('#ea-footer', 'partials/footer.html');
+      if (session.role === 'student') loadStudentView(); else loadManagerView();
+    }
+
+    function loadStudentView() {
+      EA.api('listAssignmentsForStudent', [session.token])
+        .then(function (assignments) {
+          document.getElementById('loadingState').classList.add('d-none');
+          var view = document.getElementById('studentView');
+          view.classList.remove('d-none');
+          if (assignments.length === 0) { view.innerHTML = '<p class="text-muted">Belum ada tugas.</p>'; return; }
+          view.innerHTML = assignments.map(function (a) {
+            var sub = a.mySubmission;
+            var statusBadge = !sub
+              ? '<span class="badge bg-secondary-subtle text-secondary">Belum Dikumpulkan</span>'
+              : ({ submitted: '<span class="badge bg-info-subtle text-info">Terkumpul</span>',
+                   late: '<span class="badge bg-warning-subtle text-warning">Terlambat</span>',
+                   graded: '<span class="badge bg-success-subtle text-success">Dinilai</span>' })[sub.Status];
+            var actionBtn = (!sub || sub.Status !== 'graded')
+              ? '<button class="btn btn-sm btn-ea-primary mt-2" onclick="submitFlow(\'' + a.AssignmentID + '\')">' + (sub ? 'Kumpulkan Ulang' : 'Kumpulkan Tugas') + '</button>' : '';
+            return '<div class="col-md-6"><div class="ea-card p-3 h-100">' +
+              '<div class="d-flex justify-content-between"><h5 class="mb-1">' + a.Title + '</h5>' + statusBadge + '</div>' +
+              '<p class="small text-muted mb-1">Tenggat: ' + new Date(a.DueDate).toLocaleString('id-ID') + '</p>' +
+              '<p class="small mb-0">' + (a.Instructions || '') + '</p>' +
+              (sub && sub.Score !== '' ? '<p class="fw-semibold mt-2 mb-0">Nilai: ' + sub.Score + '</p>' : '') +
+              (sub && sub.Feedback ? '<p class="small text-muted">' + sub.Feedback + '</p>' : '') +
+              actionBtn + '</div></div>';
+          }).join('');
+        });
+    }
+
+    function loadManagerView() {
+      EA.api('listMyCreatedAssignments', [session.token])
+        .then(function (assignments) {
+          document.getElementById('loadingState').classList.add('d-none');
+          var view = document.getElementById('managerView');
+          view.classList.remove('d-none');
+          var container = document.getElementById('managerList');
+          if (assignments.length === 0) { container.innerHTML = '<p class="text-muted">Belum ada tugas yang dibuat.</p>'; return; }
+          container.innerHTML = assignments.map(function (a) {
+            return '<div class="col-md-6"><div class="ea-card p-3 h-100">' +
+              '<h5 class="mb-1">' + a.Title + '</h5>' +
+              '<p class="small text-muted mb-2">Tenggat: ' + new Date(a.DueDate).toLocaleString('id-ID') + '</p>' +
+              '<p class="small mb-3">' + a.submissionCount + ' pengumpulan · ' + a.pendingCount + ' menunggu nilai</p>' +
+              '<button class="btn btn-sm btn-outline-primary" onclick="viewSubmissions(\'' + a.AssignmentID + '\', \'' + a.Title.replace(/'/g, "\\'") + '\')">Lihat Pengumpulan</button>' +
+              '</div></div>';
+          }).join('');
+        });
+    }
+
+    function submitFlow(assignmentId) {
+      var input = document.createElement('input');
+      input.type = 'file'; input.accept = 'application/pdf,image/*';
+      input.onchange = function () {
+        var file = input.files[0]; if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          EA.api('submitAssignment', [session.token, assignmentId, reader.result.split(',')[1], file.name, file.type])
+            .then(function (r) {
+              if (r.success) { eaToast('success', 'Tugas dikumpulkan'); loadStudentView(); }
+              else eaToast('error', r.message);
+            });
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+
+    function viewSubmissions(assignmentId, title) {
+      EA.api('listSubmissionsForAssignment', [session.token, assignmentId]).then(function (subs) {
+        var html = subs.length === 0
+          ? '<p class="text-muted">Belum ada siswa yang mengumpulkan.</p>'
+          : '<div class="text-start">' + subs.map(function (s) {
+              return '<div class="border-bottom py-2 d-flex justify-content-between align-items-center">' +
+                '<div><strong>' + s.studentName + '</strong>' +
+                (s.fileUrl ? ' — <a href="' + s.fileUrl + '" target="_blank">lihat file</a>' : '') +
+                (s.Score !== '' ? '<br><span class="small text-success">Nilai: ' + s.Score + '</span>' : '') +
+                (s.Feedback ? '<br><span class="small text-muted">' + s.Feedback + '</span>' : '') + '</div>' +
+                '<button class="btn btn-sm btn-ea-secondary" onclick="gradeFlow(\'' + s.SubmissionID + '\')">Nilai</button>' +
+                '</div>';
+            }).join('') + '</div>';
+        Swal.fire({ title: title, html: html, confirmButtonText: 'Tutup', width: 600 });
+      });
+    }
+
+    function gradeFlow(submissionId) {
+      Swal.fire({
+        title: 'Beri Nilai',
+        html: '<input id="sScore" type="number" class="form-control mb-2" placeholder="Nilai (0-100)">' +
+          '<textarea id="sFeedback" class="form-control" placeholder="Catatan untuk siswa"></textarea>',
+        confirmButtonText: 'Simpan', showCancelButton: true
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        EA.api('gradeSubmission', [session.token, submissionId, Number(document.getElementById('sScore').value), document.getElementById('sFeedback').value])
+          .then(function (res) {
+            if (res.success) { eaToast('success', 'Nilai disimpan'); loadManagerView(); }
+            else eaToast('error', res.message);
+          });
+      });
+    }
+
+    function createAssignmentFlow() {
+      Swal.fire({
+        title: 'Tugas Baru',
+        html: '<input id="sModId" class="form-control mb-2" placeholder="Module ID (cth: MOD-X-01)">' +
+          '<input id="sTitle" class="form-control mb-2" placeholder="Judul Tugas">' +
+          '<textarea id="sInst" class="form-control mb-2" placeholder="Instruksi"></textarea>' +
+          '<input id="sDue" type="datetime-local" class="form-control mb-2">' +
+          '<input id="sMax" type="number" class="form-control" placeholder="Nilai Maksimal" value="100">',
+        confirmButtonText: 'Buat', showCancelButton: true
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        EA.api('createAssignment', [session.token, {
+          moduleId: document.getElementById('sModId').value,
+          title: document.getElementById('sTitle').value,
+          instructions: document.getElementById('sInst').value,
+          dueDate: document.getElementById('sDue').value,
+          maxScore: Number(document.getElementById('sMax').value) || 100
+        }]).then(function (res) {
+          if (res.success) { eaToast('success', 'Tugas dibuat'); loadManagerView(); }
+          else eaToast('error', res.message);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

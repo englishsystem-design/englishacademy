@@ -1,0 +1,75 @@
+/* assets/css/custom.css
+   English Academy Indonesia — brand tokens & shared styles
+   Linked from every page's <head>. A real shared file is possible now
+   that the frontend is static-hosted — the old Apps Script version had
+   to inline this into every page's <head> via a server-side include. */
+
+:root {
+  --ea-primary: #00AEEF;
+  --ea-primary-dark: #0090C7;
+  --ea-secondary: #4CAF50;
+  --ea-accent: #FFC107;
+  --ea-ink: #1B2733;
+  --ea-ink-soft: #5B6B7A;
+  --ea-bg: #F6FAFC;
+  --ea-card-radius: 16px;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: var(--ea-bg);
+  color: var(--ea-ink);
+}
+
+h1, h2, h3, h4, h5, .ea-display { font-weight: 700; }
+.ea-eyebrow {
+  font-size: .75rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ea-primary-dark);
+}
+
+.btn-ea-primary {
+  background: var(--ea-primary); border-color: var(--ea-primary); color: #fff;
+  font-weight: 600; border-radius: 10px;
+}
+.btn-ea-primary:hover { background: var(--ea-primary-dark); border-color: var(--ea-primary-dark); color: #fff; }
+.btn-ea-secondary { background: var(--ea-secondary); border-color: var(--ea-secondary); color: #fff; font-weight: 600; border-radius: 10px; }
+.btn-ea-accent { background: var(--ea-accent); border-color: var(--ea-accent); color: var(--ea-ink); font-weight: 600; border-radius: 10px; }
+
+.ea-card {
+  background: #fff; border: 1px solid #E7EEF2; border-radius: var(--ea-card-radius);
+  box-shadow: 0 2px 10px rgba(27,39,51,.04);
+}
+.ea-stat-card { padding: 1.25rem 1.5rem; }
+.ea-stat-value { font-size: 2rem; font-weight: 800; color: var(--ea-ink); line-height: 1; }
+.ea-stat-label { font-size: .85rem; color: var(--ea-ink-soft); margin-top: .25rem; }
+
+.ea-badge-kelas {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.25rem; height: 2.25rem; border-radius: 999px;
+  background: linear-gradient(135deg, var(--ea-primary), var(--ea-secondary));
+  color: #fff; font-weight: 700; font-size: .85rem;
+}
+
+.ea-navbar { background: #fff; border-bottom: 1px solid #E7EEF2; }
+.ea-navbar .navbar-brand { font-weight: 800; color: var(--ea-ink); }
+.ea-navbar .navbar-brand span { color: var(--ea-primary); }
+.ea-navbar .nav-link { color: var(--ea-ink-soft); font-weight: 500; }
+.ea-navbar .nav-link.active { color: var(--ea-primary); font-weight: 600; }
+
+.ea-progress { height: .6rem; border-radius: 999px; background: #E7EEF2; }
+.ea-progress > div { background: linear-gradient(90deg, var(--ea-primary), var(--ea-secondary)); border-radius: 999px; }
+
+.ea-loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; color: var(--ea-ink-soft); }
+.skip-link {
+  position: absolute; left: -999px; top: 0; background: var(--ea-primary); color: #fff;
+  padding: .5rem 1rem; z-index: 2000; border-radius: 0 0 8px 0;
+}
+.skip-link:focus { left: 0; }
+
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--ea-accent); outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

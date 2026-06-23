@@ -1,0 +1,10 @@
+<footer class="mt-5 py-4 text-center text-muted small border-top bg-white">
+  <div class="container">
+    <div>© <span id="eaYear"></span> English Academy Indonesia — Kurikulum Merdeka, Kelas X–XII</div>
+    <div class="mt-1">Frontend: GitHub Pages. Backend: Google Apps Script, Google Sheets &amp; Google Drive — tanpa biaya bulanan.</div>
+  </div>
+</footer>
+<script>
+  var eaYearEl = document.getElementById('eaYear');
+  if (eaYearEl) eaYearEl.textContent = new Date().getFullYear();
+</script>
