@@ -18,14 +18,18 @@
     <p class="text-muted mb-4">Terjemahkan kata atau kalimat antara Bahasa Inggris dan Bahasa Indonesia.</p>
     <div class="ea-card p-4">
       <div class="d-flex justify-content-center mb-3">
-        <div class="btn-group">
+        <div class="btn-group" role="group">
           <button class="btn btn-outline-primary active" id="dirEnId" onclick="setDir('en-id')">English → Indonesia</button>
           <button class="btn btn-outline-primary" id="dirIdEn" onclick="setDir('id-en')">Indonesia → English</button>
         </div>
       </div>
       <div class="row g-3">
-        <div class="col-md-6"><textarea id="sourceText" class="form-control" rows="8" placeholder="Ketik teks di sini..."></textarea></div>
-        <div class="col-md-6"><textarea id="targetText" class="form-control" rows="8" readonly placeholder="Hasil terjemahan..."></textarea></div>
+        <div class="col-md-6">
+          <textarea id="sourceText" class="form-control" rows="8" placeholder="Ketik teks di sini..."></textarea>
+        </div>
+        <div class="col-md-6">
+          <textarea id="targetText" class="form-control" rows="8" readonly placeholder="Hasil terjemahan..."></textarea>
+        </div>
       </div>
       <div class="text-center mt-3">
         <button class="btn btn-ea-primary px-4" onclick="doTranslate()" id="translateBtn">Terjemahkan</button>
@@ -34,33 +38,95 @@
     </div>
   </main>
   <div id="ea-footer"></div>
-  <script src="config.js"></script><script src="assets/js/api.js"></script><script src="assets/js/app.js"></script>
+  <script src="config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
   <script>
     var session = eaRequireLogin(['admin','teacher','student']);
     var direction = 'en-id';
+
     if (session) {
       eaIncludeHTML('#ea-navbar','partials/navbar.html',function(){eaRenderNav(session);});
       eaIncludeHTML('#ea-footer','partials/footer.html');
     }
+
     function setDir(d) {
       direction = d;
-      document.getElementById('dirEnId').classList.toggle('active', d==='en-id');
-      document.getElementById('dirIdEn').classList.toggle('active', d==='id-en');
+      document.getElementById('dirEnId').classList.toggle('active', d === 'en-id');
+      document.getElementById('dirIdEn').classList.toggle('active', d === 'id-en');
     }
+
+    /**
+     * PRIMARY: Google's unofficial Translate API — called directly from the
+     * browser. No API key, CORS-friendly, fast, unaffected by Apps Script
+     * UrlFetchApp quota. This is why translator.html stopped going through
+     * the backend: Apps Script's shared outbound IPs cause quota exhaustion
+     * with third-party providers, while this endpoint has no such limit.
+     *
+     * Response shape: [[["translated","original",...]],null,"detected-lang"]
+     */
+    function translateViaGoogleFree(text, sourceLang, targetLang) {
+      var sl = sourceLang === 'auto' ? 'auto' : sourceLang;
+      var url = 'https://translate.googleapis.com/translate_a/single' +
+        '?client=gtx&sl=' + sl + '&tl=' + targetLang + '&dt=t&q=' + encodeURIComponent(text);
+      return fetch(url)
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          // Concatenate all translated sentence fragments
+          if (!data || !data[0]) throw new Error('Empty response');
+          var translated = data[0].map(function(chunk) {
+            return chunk[0] || '';
+          }).join('');
+          if (!translated) throw new Error('Empty translation');
+          return translated;
+        });
+    }
+
     function doTranslate() {
       var text = document.getElementById('sourceText').value.trim();
       if (!text) { eaToast('error','Masukkan teks terlebih dahulu.'); return; }
+
       var btn = document.getElementById('translateBtn');
-      btn.disabled = true; btn.textContent = 'Menerjemahkan...';
-      EA.api('translateText',[session.token, text, direction])
-        .then(function(r){
-          btn.disabled=false; btn.textContent='Terjemahkan';
-          if(r.success){
-            document.getElementById('targetText').value=r.translatedText;
-            document.getElementById('sourceInfo').textContent=r.source==='cache'?'Hasil dari cache (lebih cepat)':'Diterjemahkan via '+r.source;
-          } else { eaToast('error', r.message); }
+      var info = document.getElementById('sourceInfo');
+      btn.disabled = true;
+      btn.textContent = 'Menerjemahkan...';
+      info.textContent = '';
+
+      var sourceLang = direction === 'en-id' ? 'en' : 'id';
+      var targetLang = direction === 'en-id' ? 'id' : 'en';
+
+      // Try Google free API first (client-side, no quota issues)
+      translateViaGoogleFree(text, sourceLang, targetLang)
+        .then(function(translated) {
+          document.getElementById('targetText').value = translated;
+          info.textContent = 'Diterjemahkan via Google Translate';
+          btn.disabled = false;
+          btn.textContent = 'Terjemahkan';
         })
-        .catch(function(err){btn.disabled=false;btn.textContent='Terjemahkan';eaToast('error','Gagal menerjemahkan. Coba lagi.');console.error(err);});
+        .catch(function(googleErr) {
+          console.warn('Google Translate gagal, mencoba server...', googleErr);
+          // Fallback: server-side via Apps Script (MyMemory/LibreTranslate)
+          EA.api('translateText', [session.token, text, direction])
+            .then(function(r) {
+              btn.disabled = false;
+              btn.textContent = 'Terjemahkan';
+              if (r.success) {
+                document.getElementById('targetText').value = r.translatedText;
+                info.textContent = 'Diterjemahkan via ' + r.source;
+              } else {
+                eaToast('error', r.message || 'Semua layanan terjemahan tidak tersedia saat ini.');
+              }
+            })
+            .catch(function(err) {
+              btn.disabled = false;
+              btn.textContent = 'Terjemahkan';
+              eaToast('error', 'Semua layanan terjemahan tidak tersedia saat ini.');
+              console.error(err);
+            });
+        });
     }
   </script>
 </body>

@@ -73,12 +73,25 @@
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'hasil-ocr.txt'; a.click();
     }
     function translateResult() {
-      var text = document.getElementById('ocrResult').value; if (!text.trim()) return;
+      var text = document.getElementById('ocrResult').value.trim();
+      if (!text) return;
       var box = document.getElementById('translationBox');
-      box.classList.remove('d-none'); box.textContent = 'Menerjemahkan...';
-      EA.api('translateOcrResult',[session.token, text])
-        .then(function(r){box.textContent=r.success?r.translatedText:r.message;})
-        .catch(function(){box.textContent='Gagal menerjemahkan.';});
+      box.classList.remove('d-none');
+      box.textContent = 'Menerjemahkan...';
+
+      // Client-side Google Translate (same approach as translator.html)
+      fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=id&dt=t&q=' + encodeURIComponent(text.substring(0, 1000)))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var translated = data[0].map(function(c){return c[0]||'';}).join('');
+          box.textContent = translated || 'Terjemahan kosong.';
+        })
+        .catch(function() {
+          // Fallback to Apps Script server
+          EA.api('translateOcrResult', [session.token, text])
+            .then(function(r) { box.textContent = r.success ? r.translatedText : 'Gagal menerjemahkan.'; })
+            .catch(function() { box.textContent = 'Gagal menerjemahkan.'; });
+        });
     }
   </script>
 </body>

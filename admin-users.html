@@ -20,7 +20,14 @@
   <main id="ea-main" class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
       <h1 class="h3 mb-0">Manajemen Pengguna</h1>
-      <button class="btn btn-ea-primary" onclick="createUserFlow()"><i class="bi bi-person-plus me-1"></i>Tambah Pengguna</button>
+      <div class="d-flex gap-2">
+        <a href="import-students.html" class="btn btn-outline-primary">
+          <i class="bi bi-file-earmark-arrow-up me-1"></i>Import Siswa (Excel/CSV)
+        </a>
+        <button class="btn btn-ea-primary" onclick="createUserFlow()">
+          <i class="bi bi-person-plus me-1"></i>Tambah Pengguna
+        </button>
+      </div>
     </div>
     <div class="ea-card p-4">
       <table id="usersTable" class="table table-striped w-100">
